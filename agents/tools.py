@@ -1,5 +1,162 @@
 from cogsol.tools import BaseTool, tool_params
 
+
+class DetectUserLanguageTool(BaseTool):
+    """Detect and enforce the response language from chat history."""
+
+    name = "detect_user_language"
+    description = (
+        "Detect the user's language from chat messages and inject language instructions "
+        "into prompt context before the assistant generates a response."
+    )
+
+    def run(self, chat=None, data=None, secrets=None, log=None):
+        if data is None:
+            data = {}
+
+        prompt_params = data.setdefault("prompt_params", {})
+        context = prompt_params.setdefault("context", {})
+
+        first_user_message, last_user_message = self._get_user_messages(chat)
+
+        first_lang_name, first_lang_code, first_reliable = self._detect_language(
+            first_user_message
+        )
+        last_lang_name, last_lang_code, last_reliable = self._detect_language(
+            last_user_message
+        )
+
+        if first_reliable:
+            selected_name, selected_code = first_lang_name, first_lang_code
+            policy_source = "first_user_message"
+        elif last_reliable:
+            selected_name, selected_code = last_lang_name, last_lang_code
+            policy_source = "last_user_message_fallback"
+        else:
+            selected_name, selected_code = "English", "en"
+            policy_source = "default_english"
+
+        no_info_source = self._get_no_info_message(chat)
+        translated_no_info = self._translate_no_info_message(
+            no_info_source=no_info_source,
+            target_code=selected_code,
+        )
+
+        context["Preferred response language"] = selected_name
+        context["Response language policy"] = (
+            "Always respond in the language of the first user message unless the user explicitly asks to switch language."
+        )
+        context["Message of not having information"] = translated_no_info
+
+        if log:
+            log(
+                "DetectUserLanguageTool => selected="
+                f"{selected_name} ({selected_code}), source={policy_source}, "
+                f"first_reliable={first_reliable}, last_reliable={last_reliable}"
+            )
+
+        return {
+            "selected_language": selected_name,
+            "selected_language_code": selected_code,
+            "policy_source": policy_source,
+            "first_message_reliable": first_reliable,
+            "last_message_reliable": last_reliable,
+        }
+
+    def _get_user_messages(self, chat):
+        """Return first and last user messages from chat history."""
+        empty = ""
+        if chat is None or not hasattr(chat, "messages"):
+            return empty, empty
+
+        try:
+            user_messages = chat.messages.filter(role="user").order_by("msg_num")
+
+            first_obj = (
+                user_messages.first() if hasattr(user_messages, "first") else None
+            )
+            last_obj = user_messages.last() if hasattr(user_messages, "last") else None
+
+            first_text = getattr(first_obj, "content", "") if first_obj else ""
+            last_text = getattr(last_obj, "content", "") if last_obj else ""
+            return first_text or "", last_text or ""
+        except Exception:
+            return empty, empty
+
+    def _get_no_info_message(self, chat):
+        """Get the current no-information message from assistant config."""
+        default_message = "I don't have information on that topic."
+
+        try:
+            assistant = getattr(chat, "assistant", None)
+            message = getattr(assistant, "not_info_message", None)
+            return message or default_message
+        except Exception:
+            return default_message
+
+    def _detect_language(self, text):
+        """Detect language from text with pycld2, returning safe defaults."""
+        if not text or not text.strip():
+            return "English", "en", False
+
+        try:
+            import pycld2 as cld2
+
+            is_reliable, _text_bytes_found, details = cld2.detect(text)
+            if not details:
+                return "English", "en", False
+
+            lang_name = details[0][0] or "English"
+            lang_code = self._normalize_lang_code(details[0][1])
+            return lang_name, lang_code, bool(is_reliable)
+        except Exception:
+            return "English", "en", False
+
+    def _normalize_lang_code(self, code):
+        """Normalize detected language codes into translator-safe two-letter codes."""
+        if not code:
+            return "en"
+
+        normalized = str(code).strip().lower().replace("_", "-")
+
+        aliases = {
+            "zh-hans": "zh",
+            "zh-hant": "zh",
+            "pt-br": "pt",
+            "pt-pt": "pt",
+        }
+
+        if normalized in aliases:
+            return aliases[normalized]
+
+        if "-" in normalized:
+            normalized = normalized.split("-", 1)[0]
+
+        return normalized[:2] if normalized else "en"
+
+    def _translate_no_info_message(self, no_info_source, target_code):
+        """Translate no-information message to target language with safe fallback."""
+        if not no_info_source:
+            return "I don't have information on that topic."
+
+        if not target_code or target_code == "en":
+            return no_info_source
+
+        source_lang_name, source_lang_code, source_reliable = self._detect_language(
+            no_info_source
+        )
+        source_code = source_lang_code if source_reliable else "en"
+
+        try:
+            from translate import Translator
+
+            translator = Translator(to_lang=target_code, from_lang=source_code)
+            translated = translator.translate(no_info_source)
+            return translated or no_info_source
+        except Exception:
+            return no_info_source
+
+
 class CogSolScaffoldGenerator(BaseTool):
     """Generate boilerplate code for CogSol Framework components."""
     

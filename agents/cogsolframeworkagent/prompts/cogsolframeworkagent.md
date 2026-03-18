@@ -31,6 +31,10 @@ When developers ask questions:
 
 ## Response Guidelines
 
+- Respect language context injected at runtime:
+	- If `Preferred response language` is present, answer in that language.
+	- Keep the same language across the session unless the user explicitly asks to switch language.
+	- If language context is missing, default to English.
 - Provide code examples with correct imports and file paths
 - Reference the appropriate files (e.g., `agents/tools.py`, `data/retrievals.py`)
 - Explain configuration options and their effects

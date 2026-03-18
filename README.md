@@ -2,6 +2,7 @@
 
 ## Setup
 - Install CogSol Framework from: https://github.com/Pyxis-Cognitive-Solutions/cogsol-framework
+- Install local dependencies: `pip install -r requirements.txt`
 - Configure environment variables in `.env` (see `.env.example`).
 - Migrate data app first: `python manage.py migrate data`.
 - Migrate agents app next: `python manage.py migrate`.
@@ -23,6 +24,10 @@
 
 ## Running the Agent
 - Start chat with the agent: `python manage.py chat --agent CogsolFrameworkAgent`.
+
+## Language Behavior
+- The assistant detects and pins response language from the first user message in each chat.
+- Responses stay in that language unless the user explicitly asks to switch language.
 
 ## MCP Server
 - Install MCP support: `python -m pip install mcp`.
