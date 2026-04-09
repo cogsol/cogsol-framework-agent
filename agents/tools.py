@@ -366,3 +366,51 @@ class {class_name}Retrieval(BaseRetrieval):
         }
         
         return steps.get(component_type, "Check the CogSol documentation for next steps.")
+
+
+class LanguageAndMessageNotInfo(BaseTool):
+    """Imported language pretool from tenant."""
+
+    name = "language_and_message_not_info"
+    description = "Tool to detect language and set context for assistant"
+
+    def run(self, chat=None, data=None, secrets=None, log=None):
+        import pycld2 as cld2
+        from translate import Translator
+
+        if chat is None or not hasattr(chat, "messages"):
+            return {}
+
+        if data is None:
+            data = {}
+        prompt_params = data.setdefault("prompt_params", {})
+        context = prompt_params.setdefault("context", {})
+
+        assistant = getattr(chat, "assistant", None)
+        no_info_message = getattr(assistant, "not_info_message", "")
+
+        last_user = chat.messages.filter(role="user").order_by("msg_num").last()
+        last_user_msg = getattr(last_user, "content", "")
+
+        is_reliable, _text_bytes_found, details = cld2.detect(last_user_msg)
+        is_reliable_not_info, _text_bytes_not_info, details_not_info = cld2.detect(
+            no_info_message
+        )
+
+        if is_reliable:
+            context["The language you should answer to the user is"] = details[0][0]
+            if is_reliable_not_info:
+                context["Message of not having information"] = Translator(
+                    to_lang=details[0][1], from_lang=details_not_info[0][1]
+                ).translate(no_info_message)
+            else:
+                context["Message of not having information"] = Translator(
+                    to_lang=details[0][1], from_lang="es"
+                ).translate(no_info_message)
+        else:
+            context["The language you should answer to the user is"] = (
+                f"same language of the last message, that was: '{last_user_msg}'"
+            )
+            context["Message of not having information"] = no_info_message
+
+        return {}
