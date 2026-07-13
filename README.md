@@ -7,7 +7,7 @@
 - Migrate agents app next: `python manage.py migrate`.
 - Ingest documents for Cogsol Framework Docs topic:
   
-  `python manage.py ingest "Cogsol Framework Docs" ./data/CogsolFrameWorkDocs --pattern "*.txt" --ingestion-config CogsolFrameworkIngestionConfig`
+  `python manage.py ingest "Cogsol Framework Docs" ./data/CogsolFrameworkDocs --pattern "*.txt" --ingestion-config CogsolFrameworkIngestionConfig`
 
 - Ingest documents for Content API Models topic:
 
@@ -36,7 +36,7 @@
     "cogsol-framework": {
       "command": "python",
       "args": ["mcp_server.py"],
-      "cwd": "c:\\CogSol\\AgentesPrueba\\cogsol-framework-assistant"
+      "cwd": "c:\\CogSol\\AgentesPrueba\\cogsol-framework-agent"
     }
   }
 }

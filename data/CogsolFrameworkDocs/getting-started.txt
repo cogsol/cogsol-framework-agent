@@ -44,12 +44,23 @@ python --version
 ```bash
 # Option A: Install from source
 git clone <repository-url> cogsol-framework
-cd cogsol-framework/framework
+cd cogsol-framework
+
+# Create and activate a virtual environment
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+# Install dependencies
 pip install -e .
 
-# Option B: Install from PyPI (when available)
-pip install cogsol
+# Option B: Install from PyPI
+pip install cogsol-framework
 ```
+
+Using a local `.venv` keeps project dependencies isolated and prevents conflicts with global Python packages.
 
 ### Step 2: Verify Installation
 
@@ -59,7 +70,7 @@ cogsol-admin
 
 You should see:
 ```
-A command is required. Available commands: chat, importagent, ingest, makemigrations, migrate, startagent, startproject, starttopic, topics
+A command is required. Available commands: addmcptools, chat, credentials-setup, importagent, ingest, logout, makemigrations, migrate, startagent, startproject, starttopic, topics
 ```
 
 ---
@@ -69,27 +80,36 @@ A command is required. Available commands: chat, importagent, ingest, makemigrat
 ### Step 1: Create the Project
 
 ```bash
-cogsol-admin startproject my_assistant
-cd my_assistant
+cogsol-admin startproject myproject
+cd myproject
 ```
 
-### Step 2: Set Up Environment
+### Step 2: Configure Credentials
+
+Run credential onboarding first:
 
 ```bash
-# Copy the example environment file
-copy .env.example .env
+cogsol-admin credentials-setup
+```
 
-# Edit .env with your settings (use your preferred editor)
+If you do not have tenant credentials yet, visit **[https://onboarding.cogsol.ai](https://onboarding.cogsol.ai)**.
+The onboarding flow provides the credentials required to use CogSol Framework and the CLI.
+
+Most projects do not need a `.env` file for credentials. If you need project-specific overrides, copy the example file and edit only the values that should differ from your user-level credentials:
+
+```bash
+copy .env.example .env
 notepad .env
 ```
 
-Update `.env` with your CogSol API credentials:
+Update `.env` only when you need project-specific overrides:
 
 ```env
 COGSOL_ENV=development
-COGSOL_API_BASE=https://api.cogsol.ai/cognitive/
-COGSOL_CONTENT_API_BASE=https://api.cogsol.ai/content/
-COGSOL_API_TOKEN=your-api-token-here
+# Optional project-level credential overrides:
+# COGSOL_API_KEY=your-api-key-here
+# COGSOL_AUTH_CLIENT_ID=your-client-id
+# COGSOL_AUTH_SECRET=your-client-secret
 ```
 
 ### Step 3: Verify Project Setup
@@ -107,10 +127,10 @@ You should see available commands listed.
 Your new project has this structure:
 
 ```
-my_assistant/
+myproject/
 ├── manage.py           # CLI entry point (like Django's manage.py)
 ├── settings.py         # Project configuration
-├── .env               # Environment variables (don't commit!)
+├── .env               # Optional project overrides (don't commit!)
 ├── .env.example       # Environment template
 ├── README.md          # Project documentation
 ├── agents/            # Agents application (Cognitive API)
@@ -134,7 +154,7 @@ my_assistant/
 |------|---------|
 | `manage.py` | Run commands for this project |
 | `settings.py` | Project name and base configuration |
-| `.env` | API credentials (keep secret!) |
+| `.env` | Optional project-level environment overrides |
 | `agents/tools.py` | Define tools used by your agents |
 | `agents/searches.py` | Define retrieval tools for semantic search |
 | `agents/migrations/` | Track changes to your agents |
@@ -241,22 +261,22 @@ from ..tools import ExampleTool
 class CustomerSupportAgent(BaseAgent):
     # Load the system prompt
     system_prompt = Prompts.load("customersupport.md")
-    
+
     # Use QA generation config for factual responses
     generation_config = genconfigs.QA()
-    
+
     # Available tools
     tools = [ExampleTool()]
-    
+
     # Set reasonable limits
     max_responses = 10          # Allow longer conversations
     max_msg_length = 2048       # Max user message length
     max_consecutive_tool_calls = 3
     temperature = 0.3           # Lower = more consistent
-    
+
     # Welcome message
     initial_message = "Hello! Welcome to Acme Support. How can I help you today?"
-    
+
     # Message when ending conversation
     forced_termination_message = "Thank you for contacting Acme Support. Have a great day!"
 
@@ -283,7 +303,7 @@ class ShippingFAQ(BaseFAQ):
     - Standard (5-7 business days): Free for orders over $50
     - Express (2-3 business days): $9.99
     - Next Day: $19.99
-    
+
     International shipping is available to select countries."""
 
 
@@ -318,7 +338,7 @@ class EmpathyLesson(BaseLesson):
     2. Apologize for any inconvenience
     3. Focus on solutions
     4. Offer alternatives when possible
-    
+
     Example: "I understand how frustrating that must be. Let me help fix this for you." """
     context_of_application = "customer_frustration"
 
@@ -330,7 +350,7 @@ class EscalationLesson(BaseLesson):
     - Issue requires account-level changes
     - Customer remains unsatisfied after 2 solution attempts
     - Legal or sensitive matters arise
-    
+
     Say: "I'd like to connect you with a specialist who can better assist you." """
     context_of_application = "complex_issues"
 ```
@@ -338,6 +358,12 @@ class EscalationLesson(BaseLesson):
 ---
 
 ## Adding Tools
+
+> **Note:** Adding a tool to your project is a two-step process:
+> 1. **Define** the tool class in `agents/tools.py` (or `agents/searches.py` for retrieval tools).
+> 2. **Register** it in the agent by importing it and adding an instance to the `tools` list in `agents/<name>/agent.py`.
+>
+> Simply defining the tool class is not enough — the agent will not use it until it is explicitly listed in `agent.py`.
 
 ### Step 1: Create a Custom Tool
 
@@ -375,13 +401,13 @@ class OrderLookupTool(BaseTool):
     def run(self, chat=None, data=None, secrets=None, log=None, order_id: str = ""):
         if not order_id:
             return "Please provide an order ID."
-        
+
         # In a real implementation, you would query your order system
         # This is a mock response for demonstration
-        
+
         if log:
             log(f"Looking up order: {order_id}")
-        
+
         # Mock order data
         mock_orders = {
             "ORD-12345": {
@@ -395,18 +421,18 @@ class OrderLookupTool(BaseTool):
                 "eta": "December 18, 2025"
             }
         }
-        
+
         order = mock_orders.get(order_id.upper())
-        
+
         if not order:
             return f"Order {order_id} not found. Please check the order ID and try again."
-        
+
         response = f"**Order {order_id}**\n"
         response += f"- Status: {order['status']}\n"
         if order['tracking']:
             response += f"- Tracking: {order['tracking']}\n"
         response += f"- Estimated Arrival: {order['eta']}"
-        
+
         return response
 
 
@@ -424,7 +450,7 @@ class ProductSearchTool(BaseTool):
     def run(self, chat=None, data=None, secrets=None, log=None, query: str = ""):
         if not query:
             return "Please provide a search query."
-        
+
         # Mock product catalog
         products = [
             {"name": "Acme Widget Pro", "price": 99.99, "category": "Premium"},
@@ -432,20 +458,20 @@ class ProductSearchTool(BaseTool):
             {"name": "Acme Widget Enterprise", "price": "Custom", "category": "Business"},
             {"name": "Widget Accessories Pack", "price": 24.99, "category": "Accessories"},
         ]
-        
+
         # Simple search
         query_lower = query.lower()
-        matches = [p for p in products if query_lower in p["name"].lower() 
+        matches = [p for p in products if query_lower in p["name"].lower()
                    or query_lower in p["category"].lower()]
-        
+
         if not matches:
             return f"No products found matching '{query}'. Try 'widget' or 'accessories'."
-        
+
         response = f"Found {len(matches)} products:\n\n"
         for p in matches:
             price = f"${p['price']}" if isinstance(p['price'], float) else p['price']
             response += f"• **{p['name']}** - {price} ({p['category']})\n"
-        
+
         return response
 ```
 
@@ -462,18 +488,18 @@ from ..tools import OrderLookupTool, ProductSearchTool  # Updated import
 class CustomerSupportAgent(BaseAgent):
     system_prompt = Prompts.load("customersupport.md")
     generation_config = genconfigs.QA()
-    
+
     # Updated tools list
     tools = [
         OrderLookupTool(),
         ProductSearchTool(),
     ]
-    
+
     max_responses = 10
     max_msg_length = 2048
     max_consecutive_tool_calls = 3
     temperature = 0.3
-    
+
     initial_message = "Hello! Welcome to Acme Support. How can I help you today?"
     forced_termination_message = "Thank you for contacting Acme Support. Have a great day!"
 
@@ -561,13 +587,16 @@ Add a retrieval in `data/retrievals.py` to enable semantic search:
 
 ```python
 from cogsol.content import BaseRetrieval
+from data.product_docs import ProductDocsTopic
 
 
 class ProductDocsRetrieval(BaseRetrieval):
     name = "product_docs_search"
-    topic = "product_docs"
+    topic = ProductDocsTopic
     num_refs = 10
 ```
+
+This is required before creating the search tool.
 
 ### Step 6: Connect Retrieval to Agent
 
@@ -581,7 +610,7 @@ from data.retrievals import ProductDocsRetrieval
 class ProductDocsSearch(BaseRetrievalTool):
     name = "search_product_docs"
     description = "Search product documentation for answers"
-    retrieval = ProductDocsRetrieval
+    retrieval = ProductDocsRetrieval()
     parameters = []
 ```
 
@@ -598,6 +627,9 @@ class CustomerSupportAgent(BaseAgent):
     ]
 ```
 
+Without this registration in `tools`, the search will not be used.
+
+
 ### Step 7: Deploy Topics and Retrievals
 
 Create and apply migrations for your content:
@@ -609,14 +641,17 @@ python manage.py migrate data
 
 ### Step 8: Ingest Documents
 
-Upload documents to your topic:
+Upload documents to your topic. In this guide, examples place files under `data/<topic-path>/` so the file location mirrors the topic path:
 
 ```bash
 # Ingest a directory of documents
-python manage.py ingest product_docs ./docs/
+python manage.py ingest product_docs ./data/product_docs/
+
+# Ingest into a nested child topic (parent/child path)
+python manage.py ingest product_docs/tutorials ./data/product_docs/tutorials/*.pdf
 
 # Preview first (dry run)
-python manage.py ingest product_docs ./docs/ --dry-run
+python manage.py ingest product_docs ./data/product_docs/ --dry-run
 ```
 
 ### Step 9: List Topics
@@ -644,7 +679,7 @@ Created migration 0001_initial for app 'agents'.
 Check `agents/migrations/0001_initial.py`:
 
 ```python
-# Generated by CogSol 0.2.0 on 2026-01-08 10:00
+# Generated by CogSol 0.2.1 on 2026-01-08 10:00
 from cogsol.db import migrations
 
 
@@ -664,12 +699,14 @@ class Migration(migrations.Migration):
 
 ### Step 1: Ensure API Credentials
 
-Verify your `.env` file has valid credentials:
+Ensure credentials are configured with `cogsol-admin credentials-setup`.
+If needed, verify your `.env` file has valid project-level override values:
 
 ```env
-COGSOL_API_BASE=https://api.cogsol.ai/cognitive/
-COGSOL_CONTENT_API_BASE=https://api.cogsol.ai/content/
-COGSOL_API_TOKEN=sk-your-valid-token
+# Optional project-level credential overrides:
+# COGSOL_API_KEY=sk-your-valid-api-key
+# COGSOL_AUTH_CLIENT_ID=your-client-id
+# COGSOL_AUTH_SECRET=your-client-secret
 ```
 
 ### Step 2: Apply Migrations
@@ -717,10 +754,10 @@ python manage.py chat --agent CustomerSupportAgent
 This opens an interactive chat session:
 
 ```
-    ██████╗ ██████╗  ██████╗ ███████╗ ██████╗ ██╗     
-   ██╔════╝██╔═══██╗██╔════╝ ██╔════╝██╔═══██╗██║     
+    ██████╗ ██████╗  ██████╗ ███████╗ ██████╗ ██╗
+   ██╔════╝██╔═══██╗██╔════╝ ██╔════╝██╔═══██╗██║
    ...
-   
+
   🤖  Agent: CustomerSupportAgent #42
   📅  January 8, 2025 • 10:00
 
@@ -766,13 +803,13 @@ class RealOrderLookupTool(BaseTool):
     def run(self, chat=None, data=None, secrets=None, log=None, order_id: str = ""):
         # Use secrets to get API key
         api_key = secrets.get("ORDER_API_KEY") if secrets else None
-        
+
         # Make real API call
         response = requests.get(
             f"https://api.mycompany.com/orders/{order_id}",
             headers={"Authorization": f"Bearer {api_key}"}
         )
-        
+
         return response.json()
 ```
 
@@ -811,25 +848,7 @@ echo ".env" >> .gitignore
 
 ## Troubleshooting
 
-### "COGSOL_API_BASE is required"
-
-Create or update your `.env` file with your API credentials.
-
-### "Could not resolve agent"
-
-Run `migrate` first to sync your agents with the API.
-
-### "Error while importing definitions"
-
-Check for Python syntax errors:
-
-```bash
-python -c "from agents.customersupport.agent import *"
-```
-
-### "API error: 401 Unauthorized"
-
-Verify your `COGSOL_API_TOKEN` is correct and not expired.
+See [docs/troubleshooting.md](troubleshooting.md) for common errors and debug tips.
 
 ---
 
