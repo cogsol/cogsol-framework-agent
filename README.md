@@ -34,22 +34,3 @@
 ## Running the Agent
 
 - Start chat with the agent: `python manage.py chat --agent CogsolFrameworkAgent`.
-
-## MCP Server
-
-- Install MCP support: `python -m pip install mcp`.
-- Run the server over stdio: `python mcp_server.py`.
-- Tool available: `ask_cogsol_framework` with params `question` and optional `reset`.
-- Example MCP config (for clients that accept JSON server definitions):
-
-```json
-{
-  "mcpServers": {
-    "cogsol-framework": {
-      "command": "python",
-      "args": ["mcp_server.py"],
-      "cwd": "c:\\CogSol\\AgentesPrueba\\cogsol-framework-agent"
-    }
-  }
-}
-```
